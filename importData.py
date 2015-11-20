@@ -3,9 +3,10 @@ import datetime
 import pandas.io.data as web
 import matplotlib.pyplot as plt
 
-from matplotlib import style
+#from matplotlib import style
+import matplotlib
 
-style.use('fivethirtyeight')
+#style.use('fivethirtyeight')
 
 #str1=raw_input("Enter the date as From(DD-MM-YYYY) :")
 #str1=int("Enter the year")
