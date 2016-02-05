@@ -1,0 +1,192 @@
+import datetime
+import numpy as np
+import matplotlib.colors as colors
+import matplotlib.finance as finance
+import matplotlib.dates as mdates
+import matplotlib.ticker as mticker
+import matplotlib.mlab as mlab
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as font_manager
+import pandas.io.data as web
+import xlsxwriter
+import csv
+import pandas as pd
+
+
+startdate = datetime.date(2015, 1, 3)
+
+today = enddate = datetime.date.today()
+choice =raw_input("Enter the share Name : ")
+str1 = choice
+ticker =str1+"  Daily Future Chart Prestnted By Rajeev"
+sharename=str1+'.csv'
+
+str1 = "^" + choice
+start=startdate
+end=enddate
+fh1=finance.fetch_historical_yahoo("^NSEI", start, end)
+fh = pd.read_csv(sharename, parse_dates=True)
+#fh = finance.fetch_historical_yahoo(str1, start, end)
+# a numpy record array with fields: date, open, high, low, close, volume, adj_close)
+
+
+r1 = mlab.csv2rec(fh1)
+fh1.close()
+r1.sort()
+filename=str1+'.csv'
+
+
+# new=pd.DataFrame({'Open':fh[:,0],'High':fh[:,1],'Low':fh[:,2],'Close':fh[:,3],'volume':fh[:,4]})
+#new=pd.DataFrame(r)
+
+
+
+def moving_average(x, n, type='simple'):
+    """
+    compute an n period moving average.
+
+    type is 'simple' | 'exponential'
+
+    """
+    x = np.asarray(x)
+    if type == 'simple':
+        weights = np.ones(n)
+    else:
+        weights = np.exp(np.linspace(-1., 0., n))
+
+    weights /= weights.sum()
+
+    a = np.convolve(x, weights, mode='full')[:len(x)]
+    a[:n] = a[n]
+    return a
+
+
+r=fh
+
+
+def moving_average_convergence(x, nslow=26, nfast=12):
+    """
+    compute the MACD (Moving Average Convergence/Divergence) using a fast and slow exponential moving avg'
+    return value is emaslow, emafast, macd which are len(x) arrays
+    """
+    emaslow = moving_average(x, nslow, type='exponential')
+    emafast = moving_average(x, nfast, type='exponential')
+    return emaslow, emafast, emafast - emaslow
+
+
+plt.rc('axes', grid=True)
+plt.rc('grid', color='0.75', linestyle='-', linewidth=0.5)
+
+textsize = 9
+left, width = 0.1, 0.8
+rect1 = [left, 0.7, width, 0.2]
+rect2 = [left, 0.3, width, 0.4]
+rect3 = [left, 0.1, width, 0.2]
+
+
+fig = plt.figure(facecolor='white')
+axescolor = '#f6f6f6'  # the axes background color
+
+ax1 = fig.add_axes(rect1, axisbg=axescolor)  # left, bottom, width, height
+ax2 = fig.add_axes(rect2, axisbg=axescolor, sharex=ax1)
+ax2t = ax2.twinx()
+ax3 = fig.add_axes(rect3, axisbg=axescolor, sharex=ax1)
+
+
+# plot the relative strength indicator
+
+
+fillcolor = 'darkgoldenrod'
+#rs = moving_average(prices, 50, type='simple')
+ax1.plot(r['Open Interest'])
+#ax1.plot(r['Turnover'])
+ax1.set_title(ticker)
+
+CLOSE=r['Close']
+MovingAverge200=(moving_average(r['Close'], 200, type='simple'))
+MovingAverage50=(moving_average(r['Close'], 50, type='simple'))
+ax2.plot(CLOSE,label="Close")
+ax2.plot(MovingAverage50,label="MA 50")
+ax2.plot(MovingAverge200,label="MA 200")
+
+
+ax2.legend(loc='bottom left')
+ax2.set_title('Open Interest')
+ax3.fill(r['Change in OI'],'r')
+ax3.set_title('Change in OI')
+ax3.grid(True)
+
+
+#For detail data analysing and printing
+new = pd.read_csv(sharename, parse_dates=True)
+
+#new = pd.read_csv('D:/share/Nifty2015Graph.csv', parse_dates=True)
+#dfnew=  pd.read_csv('Nifty2015New.csv', parse_dates=True)
+
+#dfnew = dfnew.drop_duplicates().fillna(0)
+#dfold= dfold.drop_duplicates().fillna(0)
+
+
+
+#new= pd.concat([dfold,dfnew.tail(50)])
+new['4DayMA'] = pd.stats.moments.rolling_mean(new['Open'], 4)
+new['50DayMA'] = pd.stats.moments.rolling_mean(new['Open'], 50)
+
+new.tail(300)
+new['300DayHigh'] = new['High'].tail(300).max()
+new['300DayLow'] = new['Low'].tail(300).min()
+int1 = new['300DayHigh']-new['300DayLow']
+int1=int1*61.8/100
+new['up300  61.8%']=new['300DayLow']+int1
+#new['Down300 61.8%']=new['300DayHigh']-int1
+
+new.tail(50)
+new['50DayHigh'] = new['High'].tail(50).max()
+new['50DayLow'] = new['Low'].tail(50).min()
+int1 = new['50DayHigh']-new['50DayLow']
+int1=int1*61.8/100
+new['up50 61.8%']=new['50DayLow']+int1
+#new['Down50 61.8%']=new['50DayHigh']-int1
+
+new.tail(20)
+new['20DayHigh'] = new['High'].tail(20).max()
+new['20DayLow'] = new['Low'].tail(20).min()
+int1 =new['20DayHigh']-new['20DayLow']
+int1=int1*61.8/100
+new['20Day 61.8%']=new['20DayLow']+int1
+#new['20Down 61.8%']=new['20DayHigh']-int1
+del new['Open']
+del new['High']
+del new['Low']
+del new['Close']
+
+
+new.tail(1)
+transpose = new.tail(1).T
+writer = pd.ExcelWriter('todaYNIFTY.xlsx', engine='xlsxwriter')
+
+
+transpose.to_excel(writer, sheet_name='Sheet1')
+
+# Close the Pandas Excel writer and output the Excel file.
+writer.save()
+
+print transpose
+
+
+##top = plt.subplot2grid((8,8), (0, 0), rowspan=6, colspan=8)
+##top.plot(new1.index, new1["Close"])
+##top.plot(new1.index, new1['50DayMA'])
+
+#bottom = plt.subplot2grid((8,8), (6,0), rowspan=2, colspan=8)
+#bottom.bar(new.index, new['Volume'])
+#plt.gcf().set_size_inches(15,8)
+
+
+
+#for RSI Printing
+
+
+
+
+plt.show()
